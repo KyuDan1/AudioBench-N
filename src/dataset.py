@@ -5,8 +5,8 @@ import os
 import sys
 sys.path.append('.')
 
-from datasets import load_dataset, load_from_disk
-
+from datasets import load_dataset, load_from_disk, Audio
+from huggingface_hub import list_repo_files
 
 # =  =  =  =  =  =  =  =  =  =  =  Logging Setup  =  =  =  =  =  =  =  =  =  =  =  =  =
 logger = logging.getLogger(__name__)
@@ -16,6 +16,16 @@ logging.basicConfig(
     level=logging.INFO,
 )
 # =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =  =
+def _deduplicate_dataset_by_id(dataset):
+        seen_ids = set()
+        indices_to_keep = []
+        
+        for i, id_val in enumerate(dataset['id']):
+            if id_val not in seen_ids:
+                indices_to_keep.append(i)
+                seen_ids.add(id_val)
+                
+        return dataset.select(indices_to_keep)
 
 class Dataset(object):
 
@@ -23,9 +33,13 @@ class Dataset(object):
 
         self.dataset_name      = dataset_name
         self.number_of_samples = number_of_samples
+        self.dataset_extra     = {}
 
         # Load dataset
+        # 이 두가지 과정을 거치게 됨.
+        # load를 먼저 하고,
         self.load_dataset()
+        # 개수에 맞게 prompt를 작성함.
         self.data_format()
 
     def load_dataset(self):
@@ -49,6 +63,20 @@ class Dataset(object):
 
         elif self.dataset_name == 'librispeech_test_other': 
             self.raw_data = load_dataset("AudioLLMs/librispeech_test_other")['test']
+        
+        
+        # pip install datasets==3.6.0
+        elif self.dataset_name == 'fleurs_en_test': 
+            self.raw_data = load_dataset("google/fleurs", "en_us", split="test", trust_remote_code=True)
+        # pip install datasets==3.6.0
+        elif self.dataset_name == 'fleurs_ko_test': 
+            self.raw_data = load_dataset("google/fleurs", "ko_kr", split="test", trust_remote_code=True)
+
+        elif self.dataset_name == 'Ksponspeech_eval_clean': 
+            self.raw_data = load_dataset("Kyudan/KsponSpeech-eval-clean")['train']
+        
+        elif self.dataset_name == 'Ksponspeech_eval_other': 
+            self.raw_data = load_dataset("Kyudan/KsponSpeech_eval_other")['train']
 
         elif self.dataset_name == 'common_voice_15_en_test': 
             self.raw_data = load_dataset("AudioLLMs/common_voice_15_en_test")['test']
@@ -124,6 +152,17 @@ class Dataset(object):
 
         elif self.dataset_name == 'covost2_zh_en_test': 
             self.raw_data = load_dataset("AudioLLMs/covost2_zh_en_test")['test']
+        
+        elif self.dataset_name in ['fleurs_en_ko_test', 'fleurs_ko_en_test']:
+            fleurs_en_raw = load_dataset("google/fleurs", "en_us", split="test", trust_remote_code=True)
+            fleurs_ko_raw = load_dataset("google/fleurs", "ko_kr", split="test", trust_remote_code=True)
+            
+            fleurs_en = _deduplicate_dataset_by_id(fleurs_en_raw)
+            fleurs_ko = _deduplicate_dataset_by_id(fleurs_ko_raw)
+
+            self.raw_data = fleurs_en.sort('id') 
+            self.raw_data_en = fleurs_en.sort('id')
+            self.raw_data_ko = fleurs_ko.sort('id')
 
         elif self.dataset_name == 'covost2_ta_en_test': 
             self.raw_data = load_dataset("AudioLLMs/covost2_ta_en_test")['test']
@@ -198,7 +237,17 @@ class Dataset(object):
             self.raw_data = load_dataset("AudioLLMs/seame_dev_sge")['test']
 
         elif self.dataset_name == 'mmau_mini':
-            self.raw_data = load_dataset("AudioLLMs/MMAU-mini")['test']
+            # Use split parameter to avoid cached dataset_info issues
+            self.raw_data = load_dataset("AudioLLMs/MMAU-mini", split='test')
+
+        elif self.dataset_name == 'mmau':
+            # We need to upload mmau at huggingface
+            self.raw_data = load_dataset("Kyudan/MMAU-test")['train']
+            if 'audio' in self.raw_data.column_names and 'context' not in self.raw_data.column_names:
+                self.raw_data = self.raw_data.rename_column('audio', 'context')
+
+        elif self.dataset_name == 'cochlscene_test':
+            self.raw_data = load_dataset("Kyudan/CochlScene-test")['train']
 
         elif self.dataset_name == 'gigaspeech2_thai':
             self.raw_data = load_dataset("AudioLLMs/gigaspeech2-test", data_dir='th-test')['train']
@@ -221,6 +270,21 @@ class Dataset(object):
         elif self.dataset_name == 'spoken-mqa_multi_step_reasoning':
             self.raw_data = load_dataset('amao0o0/spoken-mqa')['multi_step_reasoning']
 
+        elif self.dataset_name == 'clotho_v1_test':
+            repo_id = 'Kyudan/clotho_v1_test'
+            try:
+                files = list_repo_files(repo_id, repo_type='dataset')
+                evaluation_files = sorted([
+                    file_name for file_name in files
+                    if file_name.startswith('evaluation/') and file_name.lower().endswith('.wav')
+                ])
+                if not evaluation_files:
+                    raise ValueError(f"No evaluation audio files found in dataset repo {repo_id}.")
+                self.raw_data = evaluation_files
+                self.dataset_extra = {"repo_id": repo_id}
+            except Exception as err:
+                raise RuntimeError(f"Failed to list files for dataset {repo_id}: {err}") from err
+            
         # Private
         elif self.dataset_name == 'ytb_asr_batch1':
             self.raw_data = load_from_disk("data/3_private_data/ytb_asr_batch1")
@@ -266,7 +330,37 @@ class Dataset(object):
         
         elif self.dataset_name == 'audiollm_instructionfollowing':
             self.raw_data = load_dataset("YichenG170/AudioLLMInstructionFollowing")
+        
+        elif self.dataset_name == 'seed_tts_test':
+            self.raw_data = load_dataset("Kyudan/seed-tts-en-test", split="train")
 
+        elif self.dataset_name == 'hike_test':
+            self.raw_data = load_dataset("thetaone-ai/HiKE", split="test")
+
+        # CCFQA: Cross-lingual Cross-modal Factuality QA
+        # Case 1: English audio -> English answer (monolingual)
+        elif self.dataset_name == 'ccfqa_eng_test':
+            self.raw_data = load_dataset("yxdu/ccfqa", split="test")
+            # Filter only English language samples
+            self.raw_data = self.raw_data.filter(lambda x: x['lang'] == 'eng')
+
+        # Case 2: Korean audio -> Korean answer (monolingual)
+        elif self.dataset_name == 'ccfqa_kor_test':
+            self.raw_data = load_dataset("yxdu/ccfqa", split="test")
+            # Filter only Korean language samples
+            self.raw_data = self.raw_data.filter(lambda x: x['lang'] == 'kor')
+
+        # Case 3: Korean audio -> English answer (cross-lingual: kor->eng)
+        elif self.dataset_name == 'ccfqa_kor_eng_test':
+            self.raw_data = load_dataset("yxdu/ccfqa", split="test")
+            # Filter only Korean language samples for audio
+            self.raw_data = self.raw_data.filter(lambda x: x['lang'] == 'kor')
+
+        # Case 4: English audio -> Korean answer (cross-lingual: eng->kor)
+        elif self.dataset_name == 'ccfqa_eng_kor_test':
+            self.raw_data = load_dataset("yxdu/ccfqa", split="test")
+            # Filter only English language samples for audio
+            self.raw_data = self.raw_data.filter(lambda x: x['lang'] == 'eng')
 
         else:
             raise NotImplementedError("Dataset {} not implemented yet".format(self.dataset_name))
@@ -274,7 +368,7 @@ class Dataset(object):
         logger.info("Loaded {} samples for evaluation".format(len(self.raw_data)))
         logger.info("= = "*20)
 
-
+    # 각 데이터셋 마다 py 파일이 있고 거기 안에 데이터셋 로딩 할 수 있음.
     def data_format(self):
 
         # if samples less than requested samples
@@ -305,6 +399,22 @@ class Dataset(object):
         elif self.dataset_name == 'librispeech_test_other': 
             from dataset_src.librispeech_test_other import librispeech_test_other_dataset
             self.dataset_processor = librispeech_test_other_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'fleurs_en_test': 
+            from dataset_src.fleurs_en_test import fleurs_en_test_dataset
+            self.dataset_processor = fleurs_en_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'fleurs_ko_test': 
+            from dataset_src.fleurs_ko_test import fleurs_ko_test_dataset
+            self.dataset_processor = fleurs_ko_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'Ksponspeech_eval_clean':
+            from dataset_src.Ksponspeech_eval_clean import Ksponspeech_eval_clean_dataset
+            self.dataset_processor = Ksponspeech_eval_clean_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'Ksponspeech_eval_other':
+            from dataset_src.Ksponspeech_eval_other import Ksponspeech_eval_other_dataset
+            self.dataset_processor = Ksponspeech_eval_other_dataset(self.raw_data, self.number_of_samples)
 
         elif self.dataset_name == 'common_voice_15_en_test':
             from dataset_src.common_voice_15_en_test import common_voice_15_en_test_dataset
@@ -406,6 +516,15 @@ class Dataset(object):
             from dataset_src.covost2_zh_en_test import covost2_zh_en_test_dataset
             self.dataset_processor = covost2_zh_en_test_dataset(self.raw_data, self.number_of_samples)
 
+        elif self.dataset_name == 'fleurs_en_ko_test':
+            from dataset_src.fleurs_en_ko_test import fleurs_en_ko_test_dataset
+            self.dataset_processor = fleurs_en_ko_test_dataset(self.raw_data, self.raw_data_en, self.raw_data_ko, self.number_of_samples)
+
+        elif self.dataset_name == 'fleurs_ko_en_test':
+            from dataset_src.fleurs_ko_en_test import fleurs_ko_en_test_dataset
+            self.dataset_processor = fleurs_ko_en_test_dataset(self.raw_data, self.raw_data_en, self.raw_data_ko, self.number_of_samples)
+
+
         elif self.dataset_name == 'covost2_ta_en_test': 
             from dataset_src.covost2_ta_en_test import covost2_ta_en_test_dataset
             self.dataset_processor = covost2_ta_en_test_dataset(self.raw_data, self.number_of_samples)
@@ -498,6 +617,14 @@ class Dataset(object):
             from dataset_src.mmau_mini import mmau_mini_test_dataset
             self.dataset_processor = mmau_mini_test_dataset(self.raw_data, self.number_of_samples)
 
+        elif self.dataset_name == 'mmau':
+            from dataset_src.mmau import mmau_test_dataset
+            self.dataset_processor = mmau_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'cochlscene_test':
+            from dataset_src.cochlscene_test import cochlscene_test_dataset
+            self.dataset_processor = cochlscene_test_dataset(self.raw_data, self.number_of_samples)
+
         elif self.dataset_name == 'gigaspeech2_thai':
             from dataset_src.gigaspeech2_thai import gigaspeech2_thai_test_dataset
             self.dataset_processor = gigaspeech2_thai_test_dataset(self.raw_data, self.number_of_samples)
@@ -526,6 +653,10 @@ class Dataset(object):
             from dataset_src.spoken_mqa import spokenmqa_dataset_reasoning
             self.dataset_processor = spokenmqa_dataset_reasoning(self.raw_data, self.number_of_samples)
 
+        elif self.dataset_name == 'clotho_v1_test':
+            from dataset_src.clotho_v1_test import clotho_v1_test_dataset
+            repo_id = self.dataset_extra.get("repo_id", "Kyudan/clotho_v1_test")
+            self.dataset_processor = clotho_v1_test_dataset(self.raw_data, self.number_of_samples, repo_id=repo_id)
 
         # Private
         elif self.dataset_name == 'ytb_asr_batch1':
@@ -592,12 +723,39 @@ class Dataset(object):
             from dataset_src.mediacorp_short_test import mediacorp_short_test_dataset
             self.dataset_processor = mediacorp_short_test_dataset(self.raw_data, self.number_of_samples)
 
+        elif self.dataset_name == 'seed_tts_test':
+            from dataset_src.seed_tts_en_test import seed_tts_en_test_dataset
+            self.dataset_processor = seed_tts_en_test_dataset(self.raw_data, self.number_of_samples)
+
         elif self.dataset_name == 'audiollm_instructionfollowing':
             from dataset_src.audiollm_instruction_following_dataset import audiollm_instruction_following_dataset
             self.dataset_processor = audiollm_instruction_following_dataset(self.raw_data, self.number_of_samples)
 
+        # HiKE: Korean-English Code-Switching ASR Benchmark
+        elif self.dataset_name == 'hike_test':
+            from dataset_src.hike_test import hike_test_dataset
+            self.dataset_processor = hike_test_dataset(self.raw_data, self.number_of_samples)
+
+        # CCFQA: Cross-lingual Cross-modal Factuality QA
+        elif self.dataset_name == 'ccfqa_eng_test':
+            from dataset_src.ccfqa_eng_test import ccfqa_eng_test_dataset
+            self.dataset_processor = ccfqa_eng_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'ccfqa_kor_test':
+            from dataset_src.ccfqa_kor_test import ccfqa_kor_test_dataset
+            self.dataset_processor = ccfqa_kor_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'ccfqa_kor_eng_test':
+            from dataset_src.ccfqa_kor_eng_test import ccfqa_kor_eng_test_dataset
+            self.dataset_processor = ccfqa_kor_eng_test_dataset(self.raw_data, self.number_of_samples)
+
+        elif self.dataset_name == 'ccfqa_eng_kor_test':
+            from dataset_src.ccfqa_eng_kor_test import ccfqa_eng_kor_test_dataset
+            self.dataset_processor = ccfqa_eng_kor_test_dataset(self.raw_data, self.number_of_samples)
+
         else:
             raise NotImplementedError("Dataset {} not implemented yet".format(self.dataset_name))
 
-        self.input_data = self.dataset_processor.prepare_model_input()
-
+        model_input = self.dataset_processor.prepare_model_input()
+        # Convert generator to list if needed to support len() and indexing
+        self.input_data = list(model_input) if hasattr(model_input, '__iter__') and not isinstance(model_input, (list, tuple)) else model_input

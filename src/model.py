@@ -33,6 +33,10 @@ class Model(object):
             from model_src.whisper_large_v3_with_llama_3_8b_instruct import whisper_large_v3_with_llama_3_8b_instruct_model_loader
             whisper_large_v3_with_llama_3_8b_instruct_model_loader(self)
 
+        elif self.model_name == "audio_flamingo_3":
+            from model_src.audio_flamingo_3 import audio_flamingo_3_model_loader
+            audio_flamingo_3_model_loader(self)
+
         elif self.model_name == "cascade_whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct":
             from model_src.whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct import whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct_model_loader
             whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct_model_loader(self)
@@ -40,6 +44,22 @@ class Model(object):
         elif self.model_name == "Qwen2-Audio-7B-Instruct":
             from model_src.qwen2_audio_7b_instruct import qwen2_audio_7b_instruct_model_loader
             qwen2_audio_7b_instruct_model_loader(self)
+
+        elif self.model_name == "Qwen_2_5_omni_7B":
+            from model_src.qwen_2_5_omni_7B import qwen_2_5_omni_model_loader
+            qwen_2_5_omni_model_loader(self)
+        
+        elif self.model_name == "Qwen_2_5_omni_3B":
+            from model_src.qwen_2_5_omni_3B import qwen_2_5_omni_model_loader
+            qwen_2_5_omni_model_loader(self)
+        
+        elif self.model_name == "Qwen_3_omni_30B_Instruct":
+            from model_src.qwen_3_omni_30B_Instruct import qwen_3_omni_model_loader
+            qwen_3_omni_model_loader(self)
+
+        elif self.model_name == "Qwen_3_omni_30B_Thinking":
+            from model_src.qwen_3_omni_30B_Thinking import qwen_3_omni_model_loader
+            qwen_3_omni_model_loader(self)
 
         elif self.model_name == "SALMONN_7B":
             from model_src.salmonn_7b import salmonn_7b_model_loader
@@ -53,6 +73,10 @@ class Model(object):
             from model_src.qwen_audio_chat import qwen_audio_chat_model_loader
             qwen_audio_chat_model_loader(self)
 
+        elif self.model_name == 'Qwen-Audio':
+            from model_src.qwen_audio import qwen_audio_model_loader
+            qwen_audio_model_loader(self)
+
         elif self.model_name == 'MERaLiON-AudioLLM-Whisper-SEA-LION':
             from model_src.meralion_audiollm_whisper_sea_lion import meralion_audiollm_whisper_sea_lion_model_loader
             meralion_audiollm_whisper_sea_lion_model_loader(self)
@@ -64,6 +88,14 @@ class Model(object):
         elif self.model_name == 'gemini-2-flash':
             from model_src.gemini_2_flash import gemini_2_flash_model_loader
             gemini_2_flash_model_loader(self)
+
+        elif self.model_name == 'gemini-2.5-flash':
+            from model_src.gemini_2_5_flash import gemini_2_5_flash_model_loader
+            gemini_2_5_flash_model_loader(self)
+        
+        elif self.model_name == 'gemini-2.5-pro':
+            from model_src.gemini_2_5_pro import gemini_2_5_pro_model_loader
+            gemini_2_5_pro_model_loader(self)
 
         elif self.model_name == 'whisper_large_v3':
             from model_src.whisper_large_v3 import whisper_large_v3_model_loader
@@ -89,12 +121,16 @@ class Model(object):
             raise NotImplementedError("Model {} not implemented yet".format(self.model_name))
 
 
-    def generate(self, input):
+    def generate(self, input, task_type=None, tts=None):
 
         with torch.no_grad():
             if self.model_name == "cascade_whisper_large_v3_llama_3_8b_instruct": 
                 from model_src.whisper_large_v3_with_llama_3_8b_instruct import whisper_large_v3_with_llama_3_8b_instruct_model_generation
                 return whisper_large_v3_with_llama_3_8b_instruct_model_generation(self, input)
+            
+            elif self.model_name == "audio_flamingo_3":
+                from model_src.audio_flamingo_3 import audio_flamingo_3_model_generation
+                return audio_flamingo_3_model_generation(self, input)
             
             elif self.model_name == "cascade_whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct":
                 from model_src.whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct import whisper_large_v2_gemma2_9b_cpt_sea_lionv3_instruct_model_generation
@@ -103,6 +139,22 @@ class Model(object):
             elif self.model_name == "Qwen2-Audio-7B-Instruct":
                 from model_src.qwen2_audio_7b_instruct import qwen2_audio_7b_instruct_model_generation
                 return qwen2_audio_7b_instruct_model_generation(self, input)
+            
+            elif self.model_name == "Qwen_2_5_omni_7B":
+                from model_src.qwen_2_5_omni_7B import qwen_2_5_omni_model_generation
+                return qwen_2_5_omni_model_generation(self, input, task_type, tts)
+            
+            elif self.model_name == "Qwen_2_5_omni_3B":
+                from model_src.qwen_2_5_omni_3B import qwen_2_5_omni_model_generation
+                return qwen_2_5_omni_model_generation(self, input, task_type, tts)
+            
+            elif self.model_name == "Qwen_3_omni_30B_Instruct":
+                from model_src.qwen_3_omni_30B_Instruct import qwen_3_omni_model_generation
+                return qwen_3_omni_model_generation(self, input, task_type)
+
+            elif self.model_name == "Qwen_3_omni_30B_Thinking":
+                from model_src.qwen_3_omni_30B_Thinking import qwen_3_omni_model_generation
+                return qwen_3_omni_model_generation(self, input, task_type)
 
             elif self.model_name == "SALMONN_7B":
                 from model_src.salmonn_7b import salmonn_7b_model_generation
@@ -115,6 +167,10 @@ class Model(object):
             elif self.model_name == "Qwen-Audio-Chat":
                 from model_src.qwen_audio_chat import qwen_audio_chat_model_generation
                 return qwen_audio_chat_model_generation(self, input)
+
+            elif self.model_name == "Qwen-Audio":
+                from model_src.qwen_audio import qwen_audio_model_generation
+                return qwen_audio_model_generation(self, input)
             
             elif self.model_name == "MERaLiON-AudioLLM-Whisper-SEA-LION":
                 from model_src.meralion_audiollm_whisper_sea_lion import meralion_audiollm_whisper_sea_lion_model_generation
@@ -127,7 +183,15 @@ class Model(object):
             elif self.model_name == "gemini-2-flash":
                 from model_src.gemini_2_flash import gemini_2_flash_model_generation
                 return gemini_2_flash_model_generation(self, input)
-
+            
+            elif self.model_name == "gemini-2.5-flash":
+                from model_src.gemini_2_5_flash import gemini_2_5_flash_model_generation
+                return gemini_2_5_flash_model_generation(self, input)
+            
+            elif self.model_name == "gemini-2.5-pro":
+                from model_src.gemini_2_5_pro import gemini_2_5_pro_model_generation
+                return gemini_2_5_pro_model_generation(self, input)
+            
             elif self.model_name == "whisper_large_v3":
                 from model_src.whisper_large_v3 import whisper_large_v3_model_generation
                 return whisper_large_v3_model_generation(self, input)

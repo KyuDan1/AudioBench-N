@@ -93,6 +93,32 @@ def remove_parentheses(text):
 
 def preprocess_text_asr(text):
 
+    # Extract content from quotes if present
+    # Look for text within single or double quotes
+    quote_patterns = [
+        r"['\"]([^'\"]+)['\"]",  # Match single or double quotes
+    ]
+    for pattern in quote_patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            # Use the last quoted text (most likely the actual transcription)
+            text = matches[-1]
+            break
+
+    # Remove common transcription prefixes
+    prefixes_to_remove = [
+        r"^the\s+(transcription|transcript|text)\s+(of\s+the\s+audio\s+is|is)[\s:]*",
+        r"^the\s+original\s+content\s+of\s+this\s+audio\s+is[\s:]*",
+        r"^here\s+is\s+the\s+(transcription|transcript)[\s:]*",
+        r"^transcription[\s:]*",
+        r"^transcript[\s:]*",
+    ]
+
+    text_lower = text.lower()
+    for prefix_pattern in prefixes_to_remove:
+        text_lower = re.sub(prefix_pattern, "", text_lower, flags=re.IGNORECASE)
+    text = text_lower
+
     # All Adapt to Lower Case
     text = text.lower()
 
