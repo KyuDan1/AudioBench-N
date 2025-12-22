@@ -85,16 +85,9 @@ class fleurs_ko_en_test_dataset(object):
 
 
     def compute_score(self, data_with_model_predictions, metrics=None):
-        from evaluate import load
-        comet_metric = load('comet')
-        # source = ["Dem Feuer konnte Einhalt geboten werden", "Schulen und Kindergärten wurden eröffnet."]
-        # hypothesis = ["The fire could be stopped", "Schools and kindergartens were open"]
-        # reference = ["They were able to control the fire.", "Schools and kindergartens opened"]
+        if metrics not in (None, 'bleu', 'comet'):
+            raise ValueError(f"Unsupported metric: {metrics}. Supported metrics: 'bleu' or 'comet'")
 
-        if metrics != 'bleu' or 'comet':
-            pass
-            #raise ValueError(f"Unsupported metric: {metrics}. Supported metrics: 'bleu' for ST")
-       
         predictions = []
         references  = []
         sources = []
@@ -119,9 +112,22 @@ class fleurs_ko_en_test_dataset(object):
             references.append(answer)
             sources.append(source)
 
-        sacrebleu = evaluate.load("sacrebleu")
-        # Updated to flores101 tokenizer (Thanks Chenyang Lv)
-        # results = sacrebleu.compute(predictions=predictions, references=references, tokenize='13a')
-        results = sacrebleu.compute(predictions=predictions, references=references, tokenize='flores101')
-        comet_score = comet_metric.compute(predictions=predictions, references=references, sources=sources)
-        return {"bleu": results['score'], "comet":comet_score['mean_score']}
+        scores = {}
+        if metrics in (None, 'bleu'):
+            sacrebleu = evaluate.load("sacrebleu")
+            # Updated to flores101 tokenizer (Thanks Chenyang Lv)
+            # results = sacrebleu.compute(predictions=predictions, references=references, tokenize='13a')
+            bleu_score = sacrebleu.compute(predictions=predictions, references=references, tokenize='flores101')
+            scores["bleu"] = bleu_score['score']
+
+        if metrics in (None, 'comet'):
+            comet_metric = evaluate.load('comet')
+            comet_score = comet_metric.compute(predictions=predictions, references=references, sources=sources)
+            if "mean_score" in comet_score:
+                scores["comet"] = comet_score["mean_score"]
+            elif "system_score" in comet_score:
+                scores["comet"] = comet_score["system_score"]
+            else:
+                raise KeyError(f"COMET output missing mean_score/system_score keys: {list(comet_score.keys())}")
+
+        return scores
