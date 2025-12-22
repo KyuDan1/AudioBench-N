@@ -124,4 +124,4 @@ class fleurs_en_ko_test_dataset(object):
         results = sacrebleu.compute(predictions=predictions, references=references, tokenize='ko-mecab')
         comet_score = comet_metric.compute(predictions=predictions, references=references, sources=sources)
 
-        return {"bleu": results['score'], "commet":comet_score['mean_score']}
+        return {"bleu": results['score'], "comet":comet_score['mean_score']}
