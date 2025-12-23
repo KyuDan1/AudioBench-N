@@ -69,9 +69,8 @@ def llama3_70b_as_judge_one_sample(args):
     )
 
     # Model
-    port = os.environ.get('MY_VLLM_PORT_JUDGE', 5001)
     openai_api_key = "EMPTY"
-    openai_api_base = f"http://localhost:{port}/v1"
+    openai_api_base = "http://10.169.39.24:11275/v1"
     client = OpenAI(
         api_key=openai_api_key,
         base_url=openai_api_base,
@@ -183,9 +182,8 @@ def llama3_70b_as_judge_binary_one_sample(args):
     )
 
     # Model
-    port = os.environ.get('MY_VLLM_PORT_JUDGE', 5001)
     openai_api_key = "EMPTY"
-    openai_api_base = f"http://localhost:{port}/v1"
+    openai_api_base = "http://10.169.39.24:11275/v1"
     client = OpenAI(
         api_key=openai_api_key,
         base_url=openai_api_base,

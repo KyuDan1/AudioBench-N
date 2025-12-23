@@ -128,13 +128,29 @@ class ccfqa_kor_test_dataset(object):
         """
         Compute evaluation scores for CCFQA benchmark
         Metrics: Character-level F1 Score or LLM-based ACC (Gemma-3-27b-it)
+        Supports multiple metrics separated by comma (e.g., "f1,gemma3_27b_judge")
         """
         if metrics is None:
             metrics = 'f1'
 
+        # Parse multiple metrics if separated by comma
+        metrics_list = [m.strip() for m in metrics.split(',')]
+
         supported_metrics = ['f1', 'gemma3_27b_judge']
-        if metrics not in supported_metrics:
-            raise ValueError(f"Unsupported metric: {metrics}. Supported: {supported_metrics}")
+        for metric in metrics_list:
+            if metric not in supported_metrics:
+                raise ValueError(f"Unsupported metric: {metric}. Supported: {supported_metrics}")
+
+        # If multiple metrics requested, compute all and merge results
+        if len(metrics_list) > 1:
+            combined_results = {}
+            for metric in metrics_list:
+                result = self.compute_score(data_with_model_predictions, metric)
+                combined_results.update(result)
+            return combined_results
+
+        # Single metric handling
+        metrics = metrics_list[0]
 
         # Handle LLM-based ACC metric (Gemma-3-27b-it judge)
         if metrics == 'gemma3_27b_judge':
@@ -155,7 +171,13 @@ class ccfqa_kor_test_dataset(object):
                 input_data=input_data_judge
             )
 
-            return judge_results
+            # Return in format expected by evaluation engine
+            # The metric key should match the metric name
+            return {
+                'gemma3_27b_judge': judge_results['acc_score'],
+                'details': judge_details,
+                **judge_results  # Include all original fields
+            }
 
         # Handle F1 metric (default)
         results = {
