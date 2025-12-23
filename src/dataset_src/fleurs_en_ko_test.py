@@ -124,13 +124,31 @@ class fleurs_en_ko_test_dataset(object):
             scores["bleu"] = bleu_score['score']
 
         if metrics in (None, 'comet'):
-            comet_metric = evaluate.load('comet')
-            comet_score = comet_metric.compute(predictions=predictions, references=references, sources=sources)
-            if "mean_score" in comet_score:
-                scores["comet"] = comet_score["mean_score"]
-            elif "system_score" in comet_score:
-                scores["comet"] = comet_score["system_score"]
-            else:
-                raise KeyError(f"COMET output missing mean_score/system_score keys: {list(comet_score.keys())}")
+            # Use COMET directly instead of evaluate wrapper due to bug in evaluate.load('comet')
+            # that returns string keys instead of actual scores
+            try:
+                from comet import download_model, load_from_checkpoint
+
+                model_path = download_model("wmt20-comet-da")
+                model = load_from_checkpoint(model_path)
+
+                # Prepare data in COMET format
+                data = [{"src": src, "mt": pred, "ref": ref}
+                        for src, pred, ref in zip(sources, predictions, references)]
+
+                # Compute scores
+                model_output = model.predict(data, batch_size=8, gpus=1)
+                scores["comet"] = model_output.system_score
+            except Exception as e:
+                logging.warning(f"COMET direct method failed: {e}, falling back to evaluate.load")
+                # Fallback to evaluate.load in case direct method fails
+                comet_metric = evaluate.load('comet')
+                comet_score = comet_metric.compute(predictions=predictions, references=references, sources=sources)
+                if "mean_score" in comet_score and not isinstance(comet_score["mean_score"], str):
+                    scores["comet"] = comet_score["mean_score"]
+                elif "system_score" in comet_score and not isinstance(comet_score["system_score"], str):
+                    scores["comet"] = comet_score["system_score"]
+                else:
+                    raise KeyError(f"COMET output has invalid values: {comet_score}")
 
         return scores
